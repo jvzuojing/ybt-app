@@ -12,6 +12,13 @@
       <div ref="radarRef" class="radar-chart"></div>
     </div>
 
+    <!-- 报表口径切换：国家报表（原有内容） / 自治区报表（getFillCount） -->
+    <div class="view-toggle">
+      <button class="view-btn" :class="{ active: reportView === 'national' }" @click="reportView = 'national'">国家报表</button>
+      <button class="view-btn" :class="{ active: reportView === 'autonomous' }" @click="reportView = 'autonomous'">自治区报表</button>
+    </div>
+
+    <template v-if="reportView === 'national'">
     <div class="card-grid" :class="{ compact: cur.cards.length <= 6 }">
       <div
         v-for="card in cur.cards"
@@ -30,6 +37,41 @@
 
     <div class="sec-title cyan">分布情况</div>
     <div ref="distRef" class="dist-chart"></div>
+    </template>
+
+    <!-- 自治区报表：两个子页签（自治区数据表 / 基层精简保留清单），明细走弹窗 -->
+    <template v-else>
+      <div class="auto-sub-tabs">
+        <span class="auto-sub-tab" :class="{ active: autoTab === 'data' }" @click="autoTab = 'data'">自治区数据表</span>
+        <span class="auto-sub-tab" :class="{ active: autoTab === 'simplify' }" @click="autoTab = 'simplify'">基层精简保留清单</span>
+      </div>
+
+      <div class="card-grid compact">
+        <div
+          v-for="card in autoCards"
+          :key="card.key"
+          class="dark-card"
+          :class="{ clickable: autoHasData }"
+          @click="autoHasData && openAutoDetail()"
+        >
+          <div class="dc-label">{{ card.label }}</div>
+          <div class="dc-value">
+            {{ autoHasData ? card.value : '—' }}<span v-if="autoHasData && card.unit" class="dc-unit">{{ card.unit }}</span>
+            <span v-if="autoHasData" class="mini-icon">📋</span>
+          </div>
+        </div>
+      </div>
+
+      <template v-if="autoTab === 'data'">
+        <div class="sec-title cyan">分布情况</div>
+        <div v-if="autoHasData" ref="autoDistRef" class="dist-chart"></div>
+        <div v-else class="dist-chart chart-empty">暂无数据</div>
+      </template>
+
+      <div class="sec-title cyan">按周期统计</div>
+      <div v-if="autoHasData" ref="autoCycleRef" class="cycle-chart"></div>
+      <div v-else class="cycle-chart chart-empty">暂无数据</div>
+    </template>
 
     <div v-if="detailVisible" class="modal-mask" @click.self="detailVisible = false">
       <div class="modal-box report-modal-box">
@@ -74,11 +116,47 @@
         </div>
       </div>
     </div>
+
+    <!-- 自治区数据表 / 基层精简保留清单 明细弹窗 -->
+    <div v-if="autoDetailVisible" class="modal-mask" @click.self="autoDetailVisible = false">
+      <div class="modal-box report-modal-box">
+        <div class="modal-header">
+          <span>{{ autoDetailTitle }}</span>
+          <span class="modal-close" @click="autoDetailVisible = false">✕</span>
+        </div>
+        <div class="modal-body">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th v-for="column in autoDetailColumns" :key="column.key">{{ column.label }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in autoPageRows" :key="row.index">
+                <td
+                  v-for="column in autoDetailColumns"
+                  :key="column.key"
+                  :class="{ 'text-left': column.align === 'left' }"
+                >{{ row[column.key] }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer report-modal-footer">
+          <span>共 {{ autoList.length }} 条</span>
+          <div class="pager-row">
+            <button class="pager-btn" :disabled="autoPage <= 1" @click="autoPage--">上一页</button>
+            <span class="pager-text">第 {{ autoPage }} / {{ autoTotalPages }} 页</span>
+            <button class="pager-btn" :disabled="autoPage >= autoTotalPages" @click="autoPage++">下一页</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { useScaledData, useRegionData } from '../composables/useRegionData'
 import { useDashboardApi } from '../composables/useDashboardApi'
@@ -89,7 +167,7 @@ type TableColumn = { key: string; label: string; align?: 'left' | 'center' }
 
 const { reportData, radarMetrics, fetchDetailList } = useScaledData()
 const { regionKey } = useRegionData()
-const { apiLoading, regionSwitching, reportStats, fillRate } = useDashboardApi()
+const { apiLoading, regionSwitching, reportStats, fillRate, autonomousFillCount, simplifyFillCount } = useDashboardApi()
 
 // 本页数据横跨两个请求阶段（填报率在 loadRegionData、报表统计在 loadGlobalData），
 // 任一请求中或区划切换全程（避免两阶段之间 loading 闪灭、数据分两波跳）都显示局部 loading
@@ -105,10 +183,13 @@ const cur = computed(() => reportData.value.national)
 
 const radarRef = ref<HTMLElement>()
 const distRef = ref<HTMLElement>()
+const autoDistRef = ref<HTMLElement>()
+const autoCycleRef = ref<HTMLElement>()
 const detailVisible = ref(false)
 // 切换区划后数据重新拉取，立即关闭明细弹窗
 watch(regionKey, () => {
   detailVisible.value = false
+  autoDetailVisible.value = false
 })
 const detailType = ref<DetailType>('report')
 const detailLoading = ref(false)
@@ -176,6 +257,195 @@ const statusClass = (status: string) => {
   if (['已建表', '已签收', '已完成', '完成建表'].includes(status)) return 'green'
   if (['待签收', '待填报'].includes(status)) return 'orange'
   return 'blue'
+}
+
+/* ---------------- 自治区报表（getFillCount：isExtended=false 数据表 / true 精简保留清单） ---------------- */
+const reportView = ref<'national' | 'autonomous'>('national')
+const autoTab = ref<'data' | 'simplify'>('data')
+
+const autoRaw = computed(() =>
+  autoTab.value === 'data' ? autonomousFillCount.value : simplifyFillCount.value
+)
+const autoHasData = computed(() => !!autoRaw.value)
+
+/** 累计数据量：万级换算成「万」，与 pc 端口径一致 */
+const formatVolumeText = (value: number) => {
+  const num = Number(value) || 0
+  if (num >= 10000) {
+    const wan = num / 10000
+    return `${Number.isInteger(wan) ? wan : wan.toFixed(1)}万`
+  }
+  return String(num)
+}
+
+const autoCards = computed(() => {
+  const raw = autoRaw.value
+  const isData = autoTab.value === 'data'
+  if (!raw) {
+    return [
+      { key: 'count', label: isData ? '数据表总数' : '基层扩展表', value: '—', unit: '' },
+      { key: 'volume', label: isData ? '累计数据总量' : '累计填报数据', value: '—', unit: '' },
+      { key: 'issue', label: '涉及下发部门总数', value: '—', unit: '' }
+    ]
+  }
+  const volumeNum = Number(raw.ledgerDataCount ?? 0)
+  return [
+    { key: 'count', label: isData ? '数据表总数' : '基层扩展表', value: String(raw.ledgerCount ?? 0), unit: '张' },
+    {
+      key: 'volume',
+      label: isData ? '累计数据总量' : '累计填报数据',
+      value: formatVolumeText(volumeNum),
+      unit: volumeNum >= 10000 ? '' : '条'
+    },
+    { key: 'issue', label: '涉及下发部门总数', value: String(raw.ledgerIssueCount ?? 0), unit: '' }
+  ]
+})
+
+/** { 名称: 数量 } → 图表数据（按数量降序） */
+const toDistList = (map: Record<string, number> | undefined) =>
+  Object.entries(map ?? {})
+    .map(([name, value]) => ({ name, value: Number(value) || 0 }))
+    .sort((a, b) => b.value - a.value)
+
+const autoDist = computed(() => toDistList(autoRaw.value?.deptLedgerCount))
+const autoCycle = computed(() => toDistList(autoRaw.value?.cycleLedgerCount))
+
+let autoDistChart: echarts.ECharts | null = null
+let autoCycleChart: echarts.ECharts | null = null
+const AUTO_CYCLE_COLORS = ['#409eff', '#5dd39e', '#f5c542', '#9b8cff', '#ff7a6b', '#4ea1ff']
+
+const renderAutoCharts = () => {
+  if (reportView.value !== 'autonomous') return
+  if (autoDistRef.value) {
+    autoDistChart = autoDistChart || echarts.init(autoDistRef.value)
+    autoDistChart.setOption(
+      {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { top: 10, left: 142, right: 44, bottom: 20 },
+        dataZoom: autoDist.value.length > 12
+          ? [{ type: 'inside', yAxisIndex: 0, startValue: 0, endValue: 11 }]
+          : [],
+        xAxis: { type: 'value', axisLabel: { fontSize: 11, color: '#666' } },
+        yAxis: {
+          type: 'category',
+          inverse: true,
+          data: autoDist.value.map((d) => d.name),
+          axisTick: { show: false },
+          axisLabel: {
+            fontSize: 11,
+            color: '#555',
+            width: 122,
+            overflow: 'truncate',
+            align: 'right',
+            margin: 12,
+            formatter: (value: string) => truncateLabel(value, 10)
+          }
+        },
+        series: [
+          {
+            type: 'bar',
+            data: autoDist.value.map((d) => d.value),
+            itemStyle: { color: '#409eff', borderRadius: [0, 4, 4, 0] },
+            barWidth: 8,
+            label: {
+              show: true,
+              position: 'right',
+              fontSize: 11,
+              color: '#409eff',
+              formatter: (params: any) => `${params.value}张`
+            }
+          }
+        ]
+      },
+      true
+    )
+  }
+  if (autoCycleRef.value) {
+    autoCycleChart = autoCycleChart || echarts.init(autoCycleRef.value)
+    autoCycleChart.setOption(
+      {
+        tooltip: { trigger: 'item', formatter: '{b}: {c}' },
+        series: [
+          {
+            type: 'pie',
+            center: ['50%', '50%'],
+            radius: ['42%', '66%'],
+            label: { color: '#555', fontSize: 11, formatter: '{b}\n{c}' },
+            labelLine: { length: 6, length2: 6, lineStyle: { color: '#c9d8ee' } },
+            itemStyle: { borderColor: '#fff', borderWidth: 2 },
+            data: autoCycle.value.map((d, i) => ({
+              ...d,
+              itemStyle: { color: AUTO_CYCLE_COLORS[i % AUTO_CYCLE_COLORS.length] }
+            }))
+          }
+        ]
+      },
+      true
+    )
+  }
+}
+
+/** 切页签时容器随 v-if 销毁重建，旧实例先释放 */
+watch([reportView, autoTab], () => {
+  autoDistChart?.dispose()
+  autoDistChart = null
+  autoCycleChart?.dispose()
+  autoCycleChart = null
+  nextTick(() => renderAutoCharts())
+})
+
+watch([autonomousFillCount, simplifyFillCount], () => nextTick(() => renderAutoCharts()), { deep: true })
+
+/* 自治区明细弹窗（ledgerListInfo 全量前端分页） */
+const autoDetailVisible = ref(false)
+const autoPage = ref(1)
+const autoPageSize = 8
+const autoDetailTitle = computed(() =>
+  autoTab.value === 'data' ? '自治区数据表明细' : '基层精简保留清单明细'
+)
+
+const autoDetailColumns = computed<TableColumn[]>(() =>
+  autoTab.value === 'data'
+    ? [
+        { key: 'index', label: '序号' },
+        { key: 'name', label: '数据表名称', align: 'left' },
+        { key: 'dept', label: '发布部门名称' },
+        { key: 'cycle', label: '填报周期' },
+        { key: 'dataTotal', label: '数据总量' },
+        { key: 'time', label: '下发时间' }
+      ]
+    : [
+        { key: 'index', label: '序号' },
+        { key: 'name', label: '数据表名称', align: 'left' },
+        { key: 'dept', label: '发布部门名称' },
+        { key: 'cycle', label: '填报周期' },
+        { key: 'dataTotal', label: '数据量' },
+        { key: 'time', label: '发布时间' }
+      ]
+)
+
+const autoList = computed(() =>
+  (autoRaw.value?.ledgerListInfo ?? []).map((item, index) => ({
+    index: index + 1,
+    name: item.ledgerName ?? '',
+    dept: item.orgName ?? '',
+    cycle: item.reportCycleName ?? '--',
+    dataTotal: String(item.dataTotal ?? 0),
+    time: item.lastOnlieTime ?? item.lastOnlineTime ?? '--'
+  }))
+)
+
+const autoTotalPages = computed(() => Math.max(1, Math.ceil(autoList.value.length / autoPageSize)))
+const autoPageRows = computed<Array<{ [key: string]: unknown; index: number }>>(() =>
+  autoList.value
+    .slice((autoPage.value - 1) * autoPageSize, autoPage.value * autoPageSize)
+    .map((row) => ({ ...row }))
+)
+
+const openAutoDetail = () => {
+  if (!autoRaw.value) return
+  autoDetailVisible.value = true
+  if (autoPage.value !== 1) autoPage.value = 1
 }
 
 let radarChart: echarts.ECharts | null = null
@@ -296,6 +566,13 @@ onMounted(() => {
   })
 })
 
+onBeforeUnmount(() => {
+  autoDistChart?.dispose()
+  autoDistChart = null
+  autoCycleChart?.dispose()
+  autoCycleChart = null
+})
+
 watch([radarMetrics, reportData], () => {
   renderRadar()
   renderDist()
@@ -363,6 +640,82 @@ watch([radarMetrics, reportData], () => {
   height: 320px;
   background: #fff;
   border-radius: 6px;
+}
+
+/* ===== 自治区报表 ===== */
+.view-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin: 4px 0 2px;
+}
+
+.view-btn {
+  min-width: 110px;
+  padding: 7px 18px;
+  font-size: 13px;
+  color: #2f7ff7;
+  background: #e3edfb;
+  border: 1px solid #c9d8ee;
+  cursor: pointer;
+}
+
+.view-btn:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.view-btn:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.view-btn.active {
+  color: #fff;
+  background: #7b6ff0;
+  border-color: #7b6ff0;
+}
+
+.auto-sub-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+
+.auto-sub-tab {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #16396e;
+  border: 1px solid #16396e;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.auto-sub-tab.active {
+  color: #16396e;
+  background: #ffe94a;
+  border-color: #ffe94a;
+}
+
+.dc-unit {
+  font-size: 11px;
+  margin-left: 1px;
+}
+
+.cycle-chart {
+  width: 100%;
+  height: 260px;
+  background: #fff;
+  border-radius: 6px;
+}
+
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9aacca;
+  font-size: 12px;
 }
 
 .text-left {

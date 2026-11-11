@@ -37,7 +37,11 @@ function toastError(message: string) {
  * 携带 cookie 登录态（credentials: 'include'）
  * apiKey 构建模式下自动附加 apiKey + app_secret（位置见 apiAuth.placement）
  */
-export async function post<T>(path: string, body?: Record<string, unknown>): Promise<T> {
+export async function post<T>(
+  path: string,
+  body?: Record<string, unknown>,
+  extraHeaders?: Record<string, string>
+): Promise<T> {
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), apiConfig.timeout)
 
@@ -58,7 +62,8 @@ export async function post<T>(path: string, body?: Record<string, unknown>): Pro
   try {
     const response = await fetch(`${apiConfig.baseURL}${path}${authQuery}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+      // 单接口额外请求头（如 getFillCount 固定要求 appKey/appSecret）
+      headers: { 'Content-Type': 'application/json;charset=UTF-8', ...(extraHeaders ?? {}) },
       credentials: 'include',
       body: JSON.stringify(payload),
       signal: controller.signal

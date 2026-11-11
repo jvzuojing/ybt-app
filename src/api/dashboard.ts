@@ -2,7 +2,7 @@
  * 大屏接口（对照《大屏接口文档》2.1 ~ 2.11）
  * 路径统一取自 apiConfig.paths，支持运行时覆盖
  */
-import { apiConfig } from '../config/api'
+import { apiAuth, apiConfig, FILL_COUNT_SECRET } from '../config/api'
 import { post } from './request'
 import type {
   AccessListVO,
@@ -11,6 +11,7 @@ import type {
   BasicDataOverviewVO,
   DataFillRateVO,
   DeptUserEntity,
+  FillCountVO,
   NationalReportVO,
   PageResult,
   RegionNode,
@@ -86,4 +87,20 @@ export function getRegionTree(regionCode?: string) {
 /** 2.11 基础数据 - 人房企场所概览 */
 export function getDaPingBasicDataOverview(regionCode?: string) {
   return post<BasicDataOverviewVO>(apiConfig.paths.basicDataOverview, { regionCode: regionCode ?? '' })
+}
+
+/**
+ * 新增：自治区报表 / 基层精简保留清单共用接口
+ * @param regionCode 区划代码（必填）
+ * @param isExtended true=基层精简保留清单，false=自治区报表
+ *
+ * 该接口为独立开放接口，文档要求固定携带 appKey + appSecret 请求头，
+ * 因此无论是否 apiKey 构建模式都显式附加，不依赖全局鉴权开关。
+ */
+export function getFillCount(regionCode: string, isExtended: boolean) {
+  return post<FillCountVO>(
+    apiConfig.paths.fillCount,
+    { regionCode, isExtended },
+    { appKey: apiAuth.apiKey, appSecret: FILL_COUNT_SECRET }
+  )
 }

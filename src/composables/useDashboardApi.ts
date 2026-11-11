@@ -14,6 +14,7 @@ import type {
   BasicDataOverviewVO,
   DataFillRateVO,
   DeptUserEntity,
+  FillCountVO,
   NationalReportVO,
   PageResult,
   RegionNode,
@@ -45,6 +46,9 @@ const accessList = ref<AccessListVO | null>(null)
 const accessLoginNum = ref<AccessLoginNumVO | null>(null)
 const basicData = ref<BasicDataOverviewVO | null>(null)
 const deptTopPage = ref<PageResult<DeptUserEntity> | null>(null)
+/** 自治区报表（getFillCount isExtended=false）与基层精简保留清单（isExtended=true） */
+const autonomousFillCount = ref<FillCountVO | null>(null)
+const simplifyFillCount = ref<FillCountVO | null>(null)
 
 /** 系统使用情况「地区/部门」查询周期：'' 昨日 / week / month / quarter / year */
 const accessTimeType = ref('week')
@@ -203,7 +207,10 @@ export async function loadGlobalData(): Promise<void> {
     track('accessTrend', dashboardApi.getAccessTrend(code)),
     track('accessRegion', dashboardApi.getAccessList(accessTimeType.value, 'region', code)),
     track('accessDept', dashboardApi.getAccessList(accessTimeType.value, 'dept', code)),
-    track('accessLogin', dashboardApi.getAccessLoginNum(code))
+    track('accessLogin', dashboardApi.getAccessLoginNum(code)),
+    // 自治区报表 / 基层精简保留清单：同一接口按 isExtended 取两份
+    dashboardApi.getFillCount(code, false),
+    dashboardApi.getFillCount(code, true)
   ])
 
   reportStats.value = settledValue(results[0] as PromiseSettledResult<ReportStatsVO>)
@@ -213,6 +220,8 @@ export async function loadGlobalData(): Promise<void> {
     settledValue(results[3] as PromiseSettledResult<AccessListVO>)
   )
   accessLoginNum.value = settledValue(results[4] as PromiseSettledResult<AccessLoginNumVO>)
+  autonomousFillCount.value = settledValue(results[5] as PromiseSettledResult<FillCountVO>)
+  simplifyFillCount.value = settledValue(results[6] as PromiseSettledResult<FillCountVO>)
 }
 
 /** 切换「地区/部门使用情况」的查询周期并重新拉取 */
@@ -295,6 +304,8 @@ export function useDashboardApi() {
     accessLoginNum,
     basicData,
     deptTopPage,
+    autonomousFillCount,
+    simplifyFillCount,
     accessTimeType,
     // 每个接口各自的 loading 状态
     apiLoading,

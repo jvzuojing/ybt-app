@@ -318,3 +318,38 @@ export interface BasicDataOverviewVO {
   company: BasicDataItem
   venue: BasicDataItem
 }
+
+/* ------------------------------------------------------------------ *
+ * 新增：自治区报表 / 基层精简保留清单（getFillCount）
+ * isExtended=false → 自治区报表；true → 基层精简保留清单
+ * ------------------------------------------------------------------ */
+
+/** 报表清单明细 */
+export interface LedgerInfo {
+  /** 该表累计数据量 */
+  dataTotal: number
+  /** 数据表名称 */
+  ledgerName: string
+  /** 发布部门名称 */
+  orgName: string
+  /** 填报周期（每半年 / 每年 / 每月 / 不定期 …） */
+  reportCycleName: string
+  /** 最后上线时间；后端字段名含拼写错误，同时兼容正确拼写 */
+  lastOnlieTime?: string
+  lastOnlineTime?: string
+}
+
+export interface FillCountVO {
+  /** 下发部门总数 */
+  ledgerIssueCount: number
+  /** 按填报频率统计：{ 每半年: 10, 每月: 3, … } */
+  cycleLedgerCount: Record<string, number>
+  /** 累计数据量 */
+  ledgerDataCount: number
+  /** 数据表分布情况：{ 部门名: 张数 } */
+  deptLedgerCount: Record<string, number>
+  /** 数据表总数 */
+  ledgerCount: number
+  /** 明细列表 */
+  ledgerListInfo: LedgerInfo[]
+}
