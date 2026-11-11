@@ -1,0 +1,238 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #eef4fb;
+  color: #333;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 顶部 tab 栏 */
+.tab-bar {
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #e3ecf7;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.tab-bar::-webkit-scrollbar { display: none; }
+
+.tab-item {
+  flex: 0 0 auto;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #555;
+  cursor: pointer;
+  position: relative;
+}
+.tab-item.active {
+  color: #2f7ff7;
+  font-weight: bold;
+  background: #eaf3ff;
+}
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: 0;
+  height: 2px;
+  background: #2f7ff7;
+  border-radius: 1px;
+}
+
+.tab-content {
+  /* 弹性占满头部/页签以外的全部空间，内容超出时在内部滚动，不再撑破视口。
+     本身是 flex 容器：BaseTab/UsageTab 的根容器靠 flex:1 撑满剩余高度 */
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 12px;
+  padding-bottom: 30px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 通用区块标题 */
+.sec-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2f7ff7;
+  margin: 16px 0 10px;
+}
+.sec-title.cyan { color: #35c3dc; }
+
+/* 深蓝数据卡片 */
+.dark-card {
+  background: linear-gradient(180deg, #1d4e89, #16386b);
+  border: 1px solid #4a7ab8;
+  border-radius: 4px;
+  color: #fff;
+  text-align: center;
+  padding: 8px 6px;
+}
+.dark-card .dc-label {
+  font-size: 12px;
+  color: #cfe3ff;
+}
+.dark-card .dc-value {
+  font-size: 15px;
+  font-weight: bold;
+  color: #fff;
+  margin-top: 4px;
+  font-family: 'Consolas', monospace;
+}
+
+/* 深蓝标签徽章 */
+.dark-badge {
+  display: inline-block;
+  background: linear-gradient(180deg, #1d4e89, #16386b);
+  border: 1px solid #4a7ab8;
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 3px;
+}
+.dark-badge b { color: #ffd75e; }
+
+/* 表格 */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: #fff;
+}
+.data-table th {
+  background: #12365f;
+  color: #7fd4c1;
+  font-weight: normal;
+  padding: 8px 6px;
+  text-align: center;
+}
+.data-table td {
+  border: 1px solid #dfe8f5;
+  padding: 8px 6px;
+  text-align: center;
+  color: #333;
+  word-break: break-word;
+}
+.data-table td.num {
+  color: #f5c542;
+  font-weight: bold;
+  font-family: 'Consolas', monospace;
+}
+
+/* 弹窗（移动端底部弹出式） */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+.modal-box {
+  background: #fff;
+  border-radius: 12px 12px 0 0;
+  width: 100%;
+  max-width: 480px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: sheet-up 0.25s ease-out;
+}
+.modal-box::before {
+  content: '';
+  display: block;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #d5deeb;
+  margin: 8px auto 0;
+  flex: 0 0 auto;
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e3ecf7;
+  font-size: 14px;
+  font-weight: bold;
+  color: #1d4e89;
+}
+.modal-close {
+  cursor: pointer;
+  color: #999;
+  font-size: 16px;
+}
+.modal-body {
+  overflow: auto;
+  padding: 10px;
+  /* 列表可滚动但不显示滚动条 */
+  scrollbar-width: none;
+}
+.modal-body::-webkit-scrollbar {
+  display: none;
+}
+.modal-body .data-table {
+  font-size: 11px;
+}
+.modal-body .data-table th,
+.modal-body .data-table td {
+  padding: 6px 4px;
+}
+.modal-body .data-table td {
+  white-space: nowrap;
+}
+
+/* 「查看全部」类弹窗：列宽固定、长部门名换行，不出现横向滚动 */
+.modal-body .data-table.wrap-table {
+  table-layout: fixed;
+}
+.modal-body .data-table.wrap-table td {
+  white-space: normal;
+  word-break: break-word;
+}
+.status-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #fff;
+}
+.status-tag.green { background: #2ea86f; }
+.status-tag.orange { background: #e8963a; }
+.status-tag.blue { background: #3b82f6; }
+
+/* 查询周期 select */
+.period-select {
+  border: 1px solid #c9d8ee;
+  background: #fff;
+  color: #333;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  outline: none;
+}

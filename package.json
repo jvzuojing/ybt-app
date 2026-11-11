@@ -1,0 +1,29 @@
+{
+  "name": "yibiaotong-dashboard",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:69": "vite --mode api69",
+    "dev:apiKey": "vite --mode apiKey",
+    "dev:apikey": "vite --mode apiKey",
+    "build": "vue-tsc && vite build",
+    "build:apiKey": "vue-tsc && vite build --mode apiKey",
+    "build:apikey": "vue-tsc && vite build --mode apiKey",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "echarts": "^5.6.0",
+    "echarts-wordcloud": "^2.1.0",
+    "element-plus": "^2.14.5",
+    "vue": "^3.5.42"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vue-tsc": "^2.2.12"
+  }
+}
