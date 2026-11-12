@@ -51,13 +51,13 @@
           v-for="card in autoCards"
           :key="card.key"
           class="dark-card"
-          :class="{ clickable: autoHasData }"
-          @click="autoHasData && openAutoDetail()"
+          :class="{ clickable: autoHasData && card.key === 'count' }"
+          @click="autoHasData && card.key === 'count' && openAutoDetail()"
         >
           <div class="dc-label">{{ card.label }}</div>
           <div class="dc-value">
             {{ autoHasData ? card.value : '—' }}<span v-if="autoHasData && card.unit" class="dc-unit">{{ card.unit }}</span>
-            <span v-if="autoHasData" class="mini-icon">📋</span>
+            <span v-if="autoHasData && card.key === 'count'" class="mini-icon">📋</span>
           </div>
         </div>
       </div>
@@ -396,7 +396,7 @@ watch([reportView, autoTab], () => {
 
 watch([autonomousFillCount, simplifyFillCount], () => nextTick(() => renderAutoCharts()), { deep: true })
 
-/* 自治区明细弹窗（ledgerListInfo 全量前端分页） */
+/* 自治区明细弹窗（ledgerListInfo 全量前端分页，仅「数据表总数 / 基层扩展表」卡片可打开） */
 const autoDetailVisible = ref(false)
 const autoPage = ref(1)
 const autoPageSize = 8

@@ -25,11 +25,16 @@ const API_TARGETS: Record<string, string> = {
 const DEFAULT_API_TARGET = 'http://10.8.21.69:80'
 
 export default defineConfig(({ mode }) => {
-  const target = process.env.VITE_API_TARGET || API_TARGETS[mode] || DEFAULT_API_TARGET
+  const override = process.env.VITE_API_TARGET
+  const target = override || API_TARGETS[mode] || DEFAULT_API_TARGET
   /** 可选：代理统一附加的会话 cookie 值（仅本地调试），设置后覆盖浏览器带来的 SESSION */
   const session = process.env.VITE_SESSION
 
-  console.log(`[vite] 接口代理目标：${target}${session ? '（已启用 VITE_SESSION 登录态注入）' : ''}`)
+  console.log(`[vite] 接口代理目标：${target}${override ? '（来自 VITE_API_TARGET 环境变量覆盖）' : ''}${session ? '（已启用 VITE_SESSION 登录态注入）' : ''}`)
+  // 79 测试环境已停用：一旦被误指向，启动时就报警，避免静默用错环境
+  if (target.includes('10.8.21.79')) {
+    console.warn('[vite] ⚠️ 代理目标指向已停用的 10.8.21.79，请改用 10.8.21.69（检查 VITE_API_TARGET 环境变量）')
+  }
   if (mode === 'apiKey') {
     console.log('[vite] apiKey 模式：路径前缀 /open/v1，每个请求附带 apiKey + app_secret')
   }
